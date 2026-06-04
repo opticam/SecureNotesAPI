@@ -5,10 +5,12 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.common.QuarkusTestResource;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest
+@QuarkusTestResource(JwtKeyTestResource.class)
 class AuthResourceTest {
 
     @Test

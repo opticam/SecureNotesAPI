@@ -9,3 +9,6 @@ target/
 Thumbs.db
 
 *.log
+
+secrets/
+src/test/resources/*Key.pem
