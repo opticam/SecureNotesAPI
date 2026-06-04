@@ -42,8 +42,8 @@ I've separated the logic into the services and kept the endpoints as a clean con
 - `NoteResource`: note and sharing endpoints.
 - `AuthService`: password hashing and JWT creation.
 - `NoteService`: ownership, sharing, and read-only enforcement.
-- `AuditFilterService` :  filters audit
-- `AuditLoggerService` :
+- `AuditFilterService` :  filters sensitive information out of audit logs
+- `AuditLoggerService` :  sends audit logs to the JBoss logging category AUDIT
 
 
 
@@ -86,7 +86,9 @@ The tests cover:
 - Read-only access for shared recipients.
 - Authentication required for protected note endpoints.
 
-I added two more tests that are helpful:
+I added a few more tests that are helpful:
+- Test for alerting on a weak password on registration
+- Testing for the AuditLoggingService added for the monitoring question.
 
 
 
@@ -238,14 +240,14 @@ Production changes should include:
 ## What would you monitor or alert on?
 
 For compliance, we need an audit pipeline.  Security signals are going to be the most important to monitor for access to our Secure Notes.
-I went ahead and stubbed this out in the app.  We use an AuditFilterService to generate an audit record for each access attempt and the AuditLoggerService logs the record.
+I went ahead and built this out in the app.  We use an AuditFilterService to generate an audit record for each access attempt and the AuditLoggerService logs the record to the JBoss logging category AUDIT.
 The AuditFilterService will filter out any secrets, full tokens, passwords or unnecessary PII from the audit records.  The AuditLoggerService sends the the re ords to the audit pipeline.
 
 We need to watch for things like when a normally active service is dark for a certain amount of minutes.
 
 I'd set a threshold for errors to be notified when an error condition is happening repeatedly or consistently.
 I'd monitor request volume to make sure the API isn't being abused.  Rate limiting should help with that, but it doesn't tell the whole story.  
-We want to know if the application is being tested or brute forced.  We want to look for patterns in the logs like a burst of 401 responses from an IP (especially if followed by a 200) indicating a successful breakin-in.
+We want to know if the application is being tested or brute forced.  We want to look for known patterns in the logs like a burst of 401 responses from an IP (especially if followed by a 200) indicating a successful breakin-in.
 
 Other things to alert for:
 Certificate expiry - this one is classic.  Thankfully with certs being rotated on a tighetr schedule these days we can avoid what used to be a yearly issue.
