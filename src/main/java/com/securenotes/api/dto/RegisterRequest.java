@@ -3,6 +3,12 @@ package com.securenotes.api.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/**
+ * Registration request for creating a new local API user.
+ *
+ * @param username unique username for login and sharing
+ * @param password plaintext password that will be stored only as a BCrypt hash
+ */
 public record RegisterRequest(
         @NotBlank(message = "username is required")
         @Size(min = 3, max = 100, message = "username must be between 3 and 100 characters")
