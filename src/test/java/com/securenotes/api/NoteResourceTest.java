@@ -4,6 +4,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.not;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.common.QuarkusTestResource;
@@ -68,7 +69,43 @@ class NoteResourceTest {
         given()
                 .auth().oauth2(otherToken)
                 .when()
+                .get("/notes")
+                .then()
+                .statusCode(200)
+                .body("content", not(hasItem("Private note")));
+
+        given()
+                .auth().oauth2(otherToken)
+                .when()
                 .get("/notes/{id}", noteId)
+                .then()
+                .statusCode(404)
+                .body("details[0]", equalTo("note was not found"));
+
+        given()
+                .auth().oauth2(otherToken)
+                .contentType("application/json")
+                .body(Map.of("content", "Unauthorized edit"))
+                .when()
+                .put("/notes/{id}", noteId)
+                .then()
+                .statusCode(404)
+                .body("details[0]", equalTo("note was not found"));
+
+        given()
+                .auth().oauth2(otherToken)
+                .contentType("application/json")
+                .body(Map.of("username", "private-other-" + System.nanoTime()))
+                .when()
+                .post("/notes/{id}/share", noteId)
+                .then()
+                .statusCode(404)
+                .body("details[0]", equalTo("note was not found"));
+
+        given()
+                .auth().oauth2(otherToken)
+                .when()
+                .delete("/notes/{id}", noteId)
                 .then()
                 .statusCode(404)
                 .body("details[0]", equalTo("note was not found"));
