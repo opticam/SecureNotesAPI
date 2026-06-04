@@ -52,7 +52,8 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         String username = request.username().trim();
         if (userRepository.findByUsername(username).isPresent()) {
-            throw new ApiException(Response.Status.CONFLICT, "username is already registered");
+            // OWASP Issue Fix: Do not acknowledge if a user by that name exists, simply return 404.
+            throw new ApiException(Response.Status.NOT_FOUND, "not found");
         }
 
         AppUser user = new AppUser();

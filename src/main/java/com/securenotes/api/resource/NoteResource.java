@@ -25,7 +25,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 /**
- * Protected note endpoints for authenticated users.
+ * Protected note endpoints for authenticated users with the {@code user} role.
  *
  * <p>Ownership and share permissions are enforced by {@link NoteService}; shared
  * notes are read-only for recipients.</p>

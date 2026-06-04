@@ -156,6 +156,7 @@ public class NoteService {
         if (note.owner.id.equals(currentUser.id) || shareRepository.exists(note, currentUser)) {
             return note;
         }
+        // Generic 404; do not reveal whether the id ever existed.
         throw new ApiException(Response.Status.NOT_FOUND, "note was not found");
     }
 
