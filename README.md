@@ -1,6 +1,6 @@
 # SecureNotesAPI
 
-Thanks for your time in reviewing yet another SecureNotesAPI Readme.
+Thanks for your time in reviewing yet another SecureNotesAPI Readme.  Attempting to keep this brief.
 
 ## My design rationale
 
@@ -18,8 +18,8 @@ I used PostgreSQL for persistence (with Hibernate ORM), Flyway for schema migrat
 - `JUnit 5` and `REST Assured`: API behavior tests for authentication, ownership, sharing, and read-only access.
 
 In terms of this stack in production, I think it's a solid design.  It helps scaling because the API is stateless, containerized, and database-backed.
-It has excellent extensions for AWS IAM Roles for Service Accounts (IRSA), letting your pods securely assume GovCloud IAM roles.
-Quarkus is great for lower cost on Kubernetes than Spring Boot (though Spring Boot would offer more on intensive security integrations).  Also, Quarkus would do well with compliance running on Iron Bank.
+It has excellent extensions for AWS IAM Roles for Service Accounts (IRSA), which is a good basis for when the app grows.
+Quarkus is great for lower cost on Kubernetes than Spring Boot (though Spring Boot could offer more on intensive security integrations).  Also, Quarkus would do well with compliance running on Iron Bank.
 The slow startup of Spring Boot is another reason why Quarkus would be a better choice, as it starts in milliseconds.
 
 The main bottleneck to manage in production will be PostgreSQL connections and query performance, not the Quarkus HTTP layer, but we'll get to that at the end section.
@@ -36,15 +36,15 @@ The main bottleneck to manage in production will be PostgreSQL connections and q
 
 ## Main components with Clean Architecture
 
-I've separated the logic into the services and kept the endpoints as a clean controller, spearating concerns.
+I've separated the logic into the services and kept the endpoints as a clean resource, spearating concerns.
 
 - `AuthResource`: registration and login endpoints.
 - `NoteResource`: note and sharing endpoints.
+
 - `AuthService`: password hashing and JWT creation.
 - `NoteService`: ownership, sharing, and read-only enforcement.
 - `AuditFilterService` :  filters sensitive information out of audit logs
 - `AuditLoggerService` :  sends audit logs to the JBoss logging category AUDIT
-
 
 
 ## How To Run the Project
@@ -62,6 +62,9 @@ The API starts at:
 - Swagger UI: `http://localhost:8080/q/swagger-ui`
 - OpenAPI document: `http://localhost:8080/q/openapi`
 
+Docker Compose starts PostgreSQL, generates local development JWT keys in the ignored `secrets/` directory if they do not already exist, and starts the API.
+
+
 
 ## How To Run the Tests
 
@@ -71,26 +74,18 @@ Tests are run with this command:
 mvn test
 ```
 
-Docker Compose starts PostgreSQL, generates local development JWT keys in the ignored `secrets/` directory if they do not already exist, and starts the API.
-
-
-Flyway applies the database schema automatically when the API starts.
-
-
 The tests cover:
 
 - Registration and duplicate username handling.
 - Login failure behavior.
 - Note create/read/update/delete by owner.
 - Unshared note isolation.
-- Read-only access for shared recipients.
+- READ-ONLY access for shared recipients.
 - Authentication required for protected note endpoints.
 
 I added a few more tests that are helpful:
-- Test for alerting on a weak password on registration
-- Testing for the AuditLoggingService added for the monitoring question.
-
-
+- Test to make sure we catch and error on a weak password on registration
+- Testing for the AuditLogging and Filter Services.
 
 
 
@@ -139,14 +134,6 @@ Status code behavior:
 
 ## Example requests
 
-Register:
-
-```powershell
-curl -X POST http://localhost:8080/auth/register `
-  -H "Content-Type: application/json" `
-  -d "{\"username\":\"alice\",\"password\":\"strong-password-123\"}"
-```
-
 Create a note:
 
 ```powershell
@@ -184,7 +171,8 @@ Additional constraints and indexes:
 
 ## Security model
 
-SmallRye JWT handles authentication and role recognition. The token identifies the user through the JWT `sub` claim and assigns the `user` group. Note ownership and sharing are intentionally enforced from PostgreSQL on each request instead of being stored inside JWT claims.
+SmallRye JWT handles authentication and role recognition. The token identifies the user through the JWT `sub` claim and assigns the `user` group. 
+Note ownership and sharing are intentionally enforced from PostgreSQL on each request instead of being stored inside JWT claims.
 
 Access rules:
 
@@ -203,7 +191,6 @@ JWT key handling:
 - Runtime JWT keys are loaded from files outside the tracked application source.
 - Local Docker Compose generates missing development keys into the ignored `secrets/` directory and mounts them read-only into the API container.
 - Tests generate an ephemeral JWT key pair under `target/test-jwt-keys`; no test signing keys are committed.
-- Regenerate local development keys manually with `.\scripts\generate-jwt-keys.ps1 -Force` if token-signing keys need to be rotated during development.
 - Production should inject keys from a secret manager or use an external OIDC provider such as Amazon Cognito, Keycloak, Microsoft Entra ID Government, or Okta for Government.
 
 
@@ -219,63 +206,53 @@ Output is written to `target/reports/apidocs/index.html`.
 
 ## How Would You Deploy this to Production?  Production deployment options
 
-I stubbed out a simple CI.yml file with steps for intgration in Github, etc.
-
-Recommended production paths:
-
-- `AWS GovCloud ECS Fargate`: run the Docker image behind an Application Load Balancer and use Amazon RDS PostgreSQL.
-- `AWS GovCloud EKS`: deploy the same container with Kubernetes manifests or Helm and use RDS PostgreSQL.
-- `OpenShift`: suitable for organizations already standardized on Red Hat-supported Kubernetes.
-- `EC2 with Docker`: viable for strict host-control environments, but it increases patching and operations burden.
+I created a simple CI.yml file with steps for my intgration in Github, etc.
+For deploying to production, since we're aligned for Kubernetes, we can use EKS (on GovCloud as needed).
+The database would be Amazon RDS Postgres.  
+We could go the route of an EC2 instance with Docker, but that carries the increased burden of patching, etc. 
+And I should mention the option of ECS Fargate using the docker image behind a load balancer.
 
 Production changes should include:
 
-- Managed PostgreSQL with encryption, backups, Multi-AZ where required, and least-privilege credentials.
 - Externalized secrets through AWS Secrets Manager, SSM Parameter Store, Kubernetes Secrets, or an approved vault.
-- Centralized identity through OIDC/SAML where enterprise SSO, MFA, CAC, or PIV is required.
-- TLS termination, private networking, WAF/rate limiting, audit logging, metrics, tracing, and vulnerability scanning.
-- Container image scanning and signed images in a trusted registry such as ECR.
+- Centralized identity through OIDC/SAML where enterprise SSO and MFA are needed.
 
 
 ## What would you monitor or alert on?
 
-For compliance, we need an audit pipeline.  Security signals are going to be the most important to monitor for access to our Secure Notes.
-I went ahead and built this out in the app.  We use an AuditFilterService to generate an audit record for each access attempt and the AuditLoggerService logs the record to the JBoss logging category AUDIT.
+I would suggest an audit pipeline.  I went ahead and built this out in the app.  We use an AuditFilterService to generate an audit record for each access attempt and the AuditLoggerService logs the record to the JBoss logging category AUDIT.
 The AuditFilterService will filter out any secrets, full tokens, passwords or unnecessary PII from the audit records.  The AuditLoggerService sends the the re ords to the audit pipeline.
 
-We need to watch for things like when a normally active service is dark for a certain amount of minutes.
+Security signals are important to monitor for our Secure Notes.
 
-I'd set a threshold for errors to be notified when an error condition is happening repeatedly or consistently.
+
 I'd monitor request volume to make sure the API isn't being abused.  Rate limiting should help with that, but it doesn't tell the whole story.  
 We want to know if the application is being tested or brute forced.  We want to look for known patterns in the logs like a burst of 401 responses from an IP (especially if followed by a 200) indicating a successful breakin-in.
 
 Other things to alert for:
-Certificate expiry - this one is classic.  Thankfully with certs being rotated on a tighetr schedule these days we can avoid what used to be a yearly issue.
 Common error conditions like "sink unreachable", or "disk full", etc.
-
+I'd set a threshold for basic errors to be notified when an error condition is happening repeatedly or consistently.
+We can watch for when a normally active service is dark for a certain amount of minutes.
+Certificate expiration
 
 
 ## How would you handle database migrations over time?
 
-Here's where our use of Flyway shines.  We decouple the migration execution from the core application runtime and treat our schema updates entirely as code. 
+Here's where our use of Flyway shines.  We can treat our schema updates as code.
 Then as a part of CI/CD, we trigger an AWS CodeBuild project or an Amazon ECS task as a formal gate for updating the database.
 
 BUT, running migrations inside an auto-scaling group during application startup introduces risks, such as split-brain scenarios where concurrent application instances attempt to modify the flyway_schema_history table at the exact same time.  So AWS recommends orchestrating migrations through a pipeline to ensure reliability.  After several years of development, your project might compile hundreds of legacy V1__init.sql, V2__add_users.sql type of files, slowing down initial spin-up.  At that time, you can baseline the database to combine all those historical stripts.  Flyway has good support for this.
 
 ## Scaling to 10,000 concurrent users
 
-To support 10,000 concurrent users, the application would need production sizing and load testing based on requests per second, p95/p99 latency, and database utilization.
+As I mentioned at the beginning, supporting 10,000 users is probably going to put the most strain on our database connections.
+Let's be sure to use load testing to understand the capacities we actually need and can expect.
 
-Required scaling changes:
+In Quarkus configuration, we can set the database connection pools so API scaling does not exhaust PostgreSQL connections.
+Also, we could look to integrate Amazon Aurora for the fully managed solution.
 
-- Run multiple stateless API instances behind a load balancer.
-- Use ECS/EKS autoscaling based on CPU, memory, request rate, and latency.
-- Store all persistent state in managed PostgreSQL.
-- Tune Quarkus and database connection pools so API scaling does not exhaust PostgreSQL connections.
-     OR we could look to integrate Amazon Aurora for the managed solution.
-- Consider PgBouncer or RDS Proxy if connection counts become a bottleneck.
-- Add and validate indexes for ownership and sharing queries under realistic data volume.
+For the rest, we can autoscale EKS based on CPU, memory and latency.  At this point, we definitely need to implement the load balancer.
+
 - Add rate limiting and throttling, especially for authentication and write endpoints. - I considered adding this currently, it's trivial but hugely important.
-- Add centralized logs, metrics, traces, dashboards, and alerts.
-- Run load tests before making capacity claims.
+I've talked about the logs, but metrics, traces, dashboards, and alerts are also hugely important at scale.
 
