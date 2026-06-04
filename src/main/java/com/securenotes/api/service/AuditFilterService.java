@@ -44,6 +44,14 @@ public class AuditFilterService implements ContainerRequestFilter, ContainerResp
     @Inject
     RoutingContext routingContext;
 
+    /**
+     * Assigns a new server-generated correlation identifier to the inbound request.
+     *
+     * <p>The filter deliberately ignores any caller-supplied correlation value so
+     * external clients cannot spoof identifiers that appear in audit records.</p>
+     *
+     * @param requestContext request metadata and per-request properties
+     */
     @Override
     public void filter(ContainerRequestContext requestContext) {
         // One id per request, used to correlate the (later) response record and
@@ -52,6 +60,18 @@ public class AuditFilterService implements ContainerRequestFilter, ContainerResp
         requestContext.setProperty(CORRELATION_PROP, UUID.randomUUID().toString());
     }
 
+    /**
+     * Emits a structured audit record for the completed request and echoes the
+     * correlation identifier to the client.
+     *
+     * <p>The record includes subject, source, target, outcome, event type, and
+     * correlation id. HTTP {@code 401} and {@code 403} responses are classified as
+     * {@code ACCESS_DENIED}; all other responses are classified as
+     * {@code API_ACCESS}.</p>
+     *
+     * @param requestContext request metadata captured by JAX-RS
+     * @param responseContext response metadata, including final HTTP status
+     */
     @Override
     public void filter(ContainerRequestContext requestContext,
                        ContainerResponseContext responseContext) {
@@ -71,7 +91,11 @@ public class AuditFilterService implements ContainerRequestFilter, ContainerResp
         responseContext.getHeaders().putSingle(CORRELATION_HEADER, correlationId);
     }
 
-    /** Non-sensitive subject identifier, or "anonymous" when unauthenticated. */
+    /**
+     * Resolves a non-sensitive subject identifier for the audit record.
+     *
+     * @return JWT principal name, or {@code anonymous} when unauthenticated or unavailable
+     */
     private String subject() {
         try {
             String name = jwt.getName();
@@ -83,9 +107,13 @@ public class AuditFilterService implements ContainerRequestFilter, ContainerResp
     }
 
     /**
-     * Best-effort client address. With proxy-address-forwarding disabled
-     * (default), this is the immediate peer; behind a TRUSTED proxy you would
-     * enable forwarding so this reflects the real client (AU-3 accuracy).
+     * Resolves the best-effort client source address.
+     *
+     * <p>With proxy address forwarding disabled, this is the immediate peer. In a
+     * production deployment behind a trusted proxy, forwarding should be enabled
+     * so the audit source reflects the real client address.</p>
+     *
+     * @return remote host address, or {@code -} when unavailable
      */
     private String sourceAddress() {
         try {

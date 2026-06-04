@@ -1,6 +1,5 @@
 package com.securenotes.api.service;
 
-import com.securenotes.api.exception.ApiException;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
@@ -27,7 +26,7 @@ import java.time.Instant;
 public class AuditLoggerService {
 
     // Separate, independently-routable category (configured in application.properties).
-    //private static final Logger AUDIT = Logger.getLogger("AUDIT");
+    private static final Logger AUDIT = Logger.getLogger("AUDIT");
 
     /**
      * Emit one structured audit record. Fields are escaped to keep the record
@@ -48,26 +47,25 @@ public class AuditLoggerService {
                        String outcome,
                        String correlationId) {
 
-         // Just stubbing this out.  No connection to an audit pipeline yet.
-
-//        AUDIT.infof("event=%s ts=%s subject=%s src=%s target=%s outcome=%s corr=%s",
-//                clean(eventType),
-//                Instant.now(),                 // AU-8: UTC, unambiguous
-//                clean(subject),
-//                clean(sourceAddress),
-//                clean(target),
-//                clean(outcome),
-//                clean(correlationId));
+        AUDIT.infof("event=%s ts=%s subject=%s src=%s target=%s outcome=%s corr=%s",
+                sanitizeForAudit(eventType),
+                Instant.now(),
+                sanitizeForAudit(subject),
+                sanitizeForAudit(sourceAddress),
+                sanitizeForAudit(target),
+                sanitizeForAudit(outcome),
+                sanitizeForAudit(correlationId));
     }
 
     /**
      * Strip CR/LF and control characters so attacker-controlled values (e.g. a
      * crafted principal name) cannot forge additional log lines. Defends the
      * integrity of audit records (AU-9).
-
+     *
+     * @param value raw audit field value
      * @return cleaned string
      */
-    private static String clean(String value) {
+    static String sanitizeForAudit(String value) {
         if (value == null) {
             return "-";
         }

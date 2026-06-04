@@ -160,6 +160,52 @@ class NoteResourceTest {
     }
 
     @Test
+    void duplicateShareReturnsExistingShare() {
+        long suffix = System.nanoTime();
+        String ownerToken = register("duplicate-share-owner-" + suffix);
+        String recipientUsername = "duplicate-share-recipient-" + suffix;
+        register(recipientUsername);
+        int noteId = createNote(ownerToken, "Duplicate share content");
+
+        given()
+                .auth().oauth2(ownerToken)
+                .contentType("application/json")
+                .body(Map.of("username", recipientUsername))
+                .when()
+                .post("/notes/{id}/share", noteId)
+                .then()
+                .statusCode(201);
+
+        given()
+                .auth().oauth2(ownerToken)
+                .contentType("application/json")
+                .body(Map.of("username", recipientUsername))
+                .when()
+                .post("/notes/{id}/share", noteId)
+                .then()
+                .statusCode(200)
+                .body("noteId", equalTo(noteId));
+    }
+
+    @Test
+    void ownerCannotShareNoteWithSelf() {
+        long suffix = System.nanoTime();
+        String ownerUsername = "self-share-owner-" + suffix;
+        String ownerToken = register(ownerUsername);
+        int noteId = createNote(ownerToken, "Self share content");
+
+        given()
+                .auth().oauth2(ownerToken)
+                .contentType("application/json")
+                .body(Map.of("username", ownerUsername))
+                .when()
+                .post("/notes/{id}/share", noteId)
+                .then()
+                .statusCode(400)
+                .body("details[0]", equalTo("owners already have full access to their notes"));
+    }
+
+    @Test
     void noteEndpointsRequireAuthentication() {
         given()
                 .when()
